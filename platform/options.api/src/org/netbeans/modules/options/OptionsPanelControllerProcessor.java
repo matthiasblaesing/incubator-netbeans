@@ -22,24 +22,18 @@ package org.netbeans.modules.options;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedSourceVersion;
+import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
-import javax.swing.JPanel;
 import org.netbeans.api.options.OptionsDisplayer;
 import org.netbeans.spi.options.AdvancedOption;
 import org.netbeans.spi.options.OptionsCategory;
@@ -57,21 +51,44 @@ import org.openide.util.NbBundle;
 import org.openide.util.lookup.ServiceProvider;
 
 @ServiceProvider(service=Processor.class)
-@SupportedSourceVersion(SourceVersion.RELEASE_7)
+@SupportedAnnotationTypes({
+    "org.netbeans.spi.options.OptionsPanelController.TopLevelRegistration", //NOI18N
+    "org.netbeans.spi.options.OptionsPanelController.ContainerRegistration", //NOI18N
+    "org.netbeans.spi.options.OptionsPanelController.SubRegistration", //NOI18N
+    "org.netbeans.spi.options.OptionsPanelController.KeywordsRegistration", //NOI18N
+    "org.netbeans.spi.options.OptionsPanelController.Keywords" //NOI18N
+})
 public class OptionsPanelControllerProcessor extends LayerGeneratingProcessor {
+
+    private static final SourceVersion SUPPORTED_SOURCE_VERSION;
+
+    static {
+        // Determine supported version at runtime. Netbeans supports being build
+        // on JDK 8, but also supports JDKs up to 12, the biggest known good
+        // source version will be reported
+        SourceVersion SUPPORTED_SOURCE_VERSION_BUILDER = null;
+        for(String version: new String[] {"RELEASE_12", "RELEASE_11", "RELEASE_10", "RELEASE_9"}) { //NOI18N
+            try {
+                SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.valueOf(version);
+                break;
+            } catch (IllegalArgumentException ex) {
+                // value not present skip it
+            }
+        }
+        if(SUPPORTED_SOURCE_VERSION_BUILDER == null) {
+            SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.RELEASE_8;
+        }
+        SUPPORTED_SOURCE_VERSION = SUPPORTED_SOURCE_VERSION_BUILDER;
+    }
+
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SUPPORTED_SOURCE_VERSION;
+    }
 
     private Element originatingElement;
 
-    public @Override Set<String> getSupportedAnnotationTypes() {
-        return new HashSet<String>(Arrays.asList(
-            TopLevelRegistration.class.getCanonicalName(),
-            ContainerRegistration.class.getCanonicalName(),
-            SubRegistration.class.getCanonicalName(),
-            KeywordsRegistration.class.getCanonicalName(),
-            Keywords.class.getCanonicalName()
-        ));
-    }
-
+    @Override
     protected boolean handleProcess(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) throws LayerGenerationException {
         if (roundEnv.processingOver()) {
             return false;

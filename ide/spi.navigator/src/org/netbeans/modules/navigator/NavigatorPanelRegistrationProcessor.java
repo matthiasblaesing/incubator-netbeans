@@ -19,12 +19,10 @@
 
 package org.netbeans.modules.navigator;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedSourceVersion;
+import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
@@ -34,11 +32,35 @@ import org.openide.filesystems.annotations.LayerGenerationException;
 import org.openide.util.lookup.ServiceProvider;
 
 @ServiceProvider(service=Processor.class)
-@SupportedSourceVersion(SourceVersion.RELEASE_7)
+@SupportedAnnotationTypes({
+    "org.netbeans.spi.navigator.NavigatorPanel.Registration", // NOI18N
+    "org.netbeans.spi.navigator.NavigatorPanel.Registrations" // NOI18N
+})
 public class NavigatorPanelRegistrationProcessor extends LayerGeneratingProcessor {
+    private static final SourceVersion SUPPORTED_SOURCE_VERSION;
 
-    @Override public Set<String> getSupportedAnnotationTypes() {
-        return new HashSet<String>(Arrays.asList(NavigatorPanel.Registration.class.getCanonicalName(), NavigatorPanel.Registrations.class.getCanonicalName()));
+    static {
+        // Determine supported version at runtime. Netbeans supports being build
+        // on JDK 8, but also supports JDKs up to 12, the biggest known good
+        // source version will be reported
+        SourceVersion SUPPORTED_SOURCE_VERSION_BUILDER = null;
+        for(String version: new String[] {"RELEASE_12", "RELEASE_11", "RELEASE_10", "RELEASE_9"}) { // NOI18N
+            try {
+                SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.valueOf(version);
+                break;
+            } catch (IllegalArgumentException ex) {
+                // value not present skip it
+            }
+        }
+        if(SUPPORTED_SOURCE_VERSION_BUILDER == null) {
+            SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.RELEASE_8;
+        }
+        SUPPORTED_SOURCE_VERSION = SUPPORTED_SOURCE_VERSION_BUILDER;
+    }
+
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SUPPORTED_SOURCE_VERSION;
     }
 
     @Override protected boolean handleProcess(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) throws LayerGenerationException {

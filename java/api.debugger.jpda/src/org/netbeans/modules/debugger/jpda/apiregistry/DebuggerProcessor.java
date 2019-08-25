@@ -19,13 +19,11 @@
 
 package org.netbeans.modules.debugger.jpda.apiregistry;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedSourceVersion;
+import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
@@ -54,20 +52,42 @@ import org.openide.util.lookup.ServiceProvider;
  * @author Martin Entlicher
  */
 @ServiceProvider(service=Processor.class)
-@SupportedSourceVersion(SourceVersion.RELEASE_7)
+@SupportedAnnotationTypes({
+    "org.netbeans.api.debugger.jpda.JPDADebugger.Registration", // NOI18N
+    "org.netbeans.spi.debugger.jpda.SmartSteppingCallback.Registration", // NOI18N
+    "org.netbeans.spi.debugger.jpda.SourcePathProvider.Registration", // NOI18N
+    "org.netbeans.spi.debugger.jpda.EditorContext.Registration", // NOI18N
+    "org.netbeans.spi.debugger.jpda.Evaluator.Registration", // NOI18N
+    "org.netbeans.spi.debugger.jpda.BreakpointsClassFilter.Registration" // NOI18N
+})
 public class DebuggerProcessor extends LayerGeneratingProcessor {
 
     public static final String SERVICE_NAME = "serviceName"; // NOI18N
+    
+    private static final SourceVersion SUPPORTED_SOURCE_VERSION;
 
-    public @Override Set<String> getSupportedAnnotationTypes() {
-        return new HashSet<String>(Arrays.asList(
-            JPDADebugger.Registration.class.getCanonicalName(),
-            SmartSteppingCallback.Registration.class.getCanonicalName(),
-            SourcePathProvider.Registration.class.getCanonicalName(),
-            EditorContext.Registration.class.getCanonicalName(),
-            Evaluator.Registration.class.getCanonicalName(),
-            BreakpointsClassFilter.Registration.class.getCanonicalName()
-        ));
+    static {
+        // Determine supported version at runtime. Netbeans supports being build
+        // on JDK 8, but also supports JDKs up to 12, the biggest known good
+        // source version will be reported
+        SourceVersion SUPPORTED_SOURCE_VERSION_BUILDER = null;
+        for(String version: new String[] {"RELEASE_12", "RELEASE_11", "RELEASE_10", "RELEASE_9"}) { // NOI18N
+            try {
+                SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.valueOf(version);
+                break;
+            } catch (IllegalArgumentException ex) {
+                // value not present skip it
+            }
+        }
+        if(SUPPORTED_SOURCE_VERSION_BUILDER == null) {
+            SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.RELEASE_8;
+        }
+        SUPPORTED_SOURCE_VERSION = SUPPORTED_SOURCE_VERSION_BUILDER;
+    }
+
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SUPPORTED_SOURCE_VERSION;
     }
 
     @Override

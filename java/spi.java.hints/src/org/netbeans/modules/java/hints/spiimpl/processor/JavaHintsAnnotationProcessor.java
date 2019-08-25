@@ -22,14 +22,11 @@ package org.netbeans.modules.java.hints.spiimpl.processor;
 import java.lang.reflect.Array;
 import java.util.Map.Entry;
 import java.util.*;
-import java.util.AbstractMap.SimpleEntry;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
@@ -44,20 +41,41 @@ import org.openide.filesystems.annotations.LayerBuilder;
 import org.openide.filesystems.annotations.LayerBuilder.File;
 import org.openide.filesystems.annotations.LayerGeneratingProcessor;
 import org.openide.filesystems.annotations.LayerGenerationException;
-import org.openide.util.NbCollections;
 import org.openide.util.lookup.ServiceProvider;
 
 /**Inspired by https://sezpoz.dev.java.net/.
  *
  * @author lahvac
  */
-@SupportedSourceVersion(SourceVersion.RELEASE_7)
 @SupportedAnnotationTypes("org.netbeans.spi.java.hints.*")
 @ServiceProvider(service=Processor.class, position=100)
 public class JavaHintsAnnotationProcessor extends LayerGeneratingProcessor {
-    
-    private static final Logger LOG = Logger.getLogger(JavaHintsAnnotationProcessor.class.getName());
-    
+    private static final SourceVersion SUPPORTED_SOURCE_VERSION;
+
+    static {
+        // Determine supported version at runtime. Netbeans supports being build
+        // on JDK 8, but also supports JDKs up to 12, the biggest known good
+        // source version will be reported
+        SourceVersion SUPPORTED_SOURCE_VERSION_BUILDER = null;
+        for(String version: new String[] {"RELEASE_12", "RELEASE_11", "RELEASE_10", "RELEASE_9"}) { // NOI18N
+            try {
+                SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.valueOf(version);
+                break;
+            } catch (IllegalArgumentException ex) {
+                // value not present skip it
+            }
+        }
+        if(SUPPORTED_SOURCE_VERSION_BUILDER == null) {
+            SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.RELEASE_8;
+        }
+        SUPPORTED_SOURCE_VERSION = SUPPORTED_SOURCE_VERSION_BUILDER;
+    }
+
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SUPPORTED_SOURCE_VERSION;
+    }
+
     @Override
     protected boolean handleProcess(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) throws LayerGenerationException {
         if (!roundEnv.processingOver()) {
@@ -261,7 +279,7 @@ public class JavaHintsAnnotationProcessor extends LayerGeneratingProcessor {
         if (clazz.isArray()) {
             Iterable<?> attributes = getAttributeValueInternal(annotation, attribute, Iterable.class);
             
-            Collection<Object> coll = new ArrayList<Object>();
+            Collection<Object> coll = new ArrayList<>();
             Class<?> componentType = clazz.getComponentType();
 
             for (Object attr : attributes) {
@@ -416,7 +434,7 @@ public class JavaHintsAnnotationProcessor extends LayerGeneratingProcessor {
 
     private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\$[a-zA-Z0-9_]+");
     private boolean verifyTriggerAnnotations(ExecutableElement method) {
-        List<AnnotationMirror> patternAnnotations = new ArrayList<AnnotationMirror>();
+        List<AnnotationMirror> patternAnnotations = new ArrayList<>();
         AnnotationMirror am = findAnnotation(method.getAnnotationMirrors(), "org.netbeans.spi.java.hints.TriggerPattern");
 
         if (am != null) {
@@ -434,7 +452,7 @@ public class JavaHintsAnnotationProcessor extends LayerGeneratingProcessor {
 
             if (pattern == null) continue;
 
-            Set<String> variables = new HashSet<String>();
+            Set<String> variables = new HashSet<>();
             Matcher m = VARIABLE_PATTERN.matcher(pattern);
 
             while (m.find()) {
@@ -516,46 +534,55 @@ public class JavaHintsAnnotationProcessor extends LayerGeneratingProcessor {
             this.errAnnotationValue = errAnnotationValue;
         }
 
+        @Override
         public Void visitBoolean(boolean b, Void p) {
             annotationFolder.boolvalue(attrName, b);
             return null;
         }
 
+        @Override
         public Void visitByte(byte b, Void p) {
             annotationFolder.bytevalue(attrName, b);
             return null;
         }
 
+        @Override
         public Void visitChar(char c, Void p) {
             annotationFolder.charvalue(attrName, c);
             return null;
         }
 
+        @Override
         public Void visitDouble(double d, Void p) {
             annotationFolder.doublevalue(attrName, d);
             return null;
         }
 
+        @Override
         public Void visitFloat(float f, Void p) {
             annotationFolder.floatvalue(attrName, f);
             return null;
         }
 
+        @Override
         public Void visitInt(int i, Void p) {
             annotationFolder.intvalue(attrName, i);
             return null;
         }
 
+        @Override
         public Void visitLong(long i, Void p) {
             annotationFolder.longvalue(attrName, i);
             return null;
         }
 
+        @Override
         public Void visitShort(short s, Void p) {
             annotationFolder.shortvalue(attrName, s);
             return null;
         }
 
+        @Override
         public Void visitString(String s, Void p) {
             if ("displayName".equals(attrName) || "description".equals(attrName) || "tooltip".equals(attrName)) {
                 try {
@@ -569,17 +596,20 @@ public class JavaHintsAnnotationProcessor extends LayerGeneratingProcessor {
             return null;
         }
 
+        @Override
         public Void visitType(TypeMirror t, Void p) {
             annotationFolder.stringvalue(attrName, getFQN(((TypeElement) ((DeclaredType) t).asElement())));
             return null;
         }
 
+        @Override
         public Void visitEnumConstant(VariableElement c, Void p) {
             TypeElement owner = (TypeElement) c.getEnclosingElement();
             annotationFolder.stringvalue(attrName, getFQN(owner) + "." + c.getSimpleName());
             return null;
         }
 
+        @Override
         public Void visitAnnotation(AnnotationMirror a, Void p) {
             File f = builder.folder(annotationFolder.getPath() + "/" + attrName);
             
@@ -589,6 +619,7 @@ public class JavaHintsAnnotationProcessor extends LayerGeneratingProcessor {
             return null;
         }
 
+        @Override
         public Void visitArray(List<? extends AnnotationValue> vals, Void p) {
             File arr = builder.folder(annotationFolder.getPath() + "/" + attrName);
             int c = 0;

@@ -20,16 +20,14 @@
 package org.netbeans.modules.openide.util;
 
 import java.lang.annotation.Annotation;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.processing.Completion;
 import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedSourceVersion;
+import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
@@ -42,19 +40,41 @@ import org.openide.util.lookup.ServiceProvider;
 import org.openide.util.lookup.ServiceProviders;
 import org.openide.util.lookup.implspi.AbstractServiceProviderProcessor;
 
-@SupportedSourceVersion(SourceVersion.RELEASE_7)
+@SupportedAnnotationTypes({
+    "org.openide.util.lookup.ServiceProvider", //NOI18N
+    "org.openide.util.lookup.ServiceProviders" //NOI18N
+})
 public class ServiceProviderProcessor extends AbstractServiceProviderProcessor {
+    private static final SourceVersion SUPPORTED_SOURCE_VERSION;
 
-    public @Override Set<String> getSupportedAnnotationTypes() {
-        return new HashSet<String>(Arrays.asList(
-            ServiceProvider.class.getCanonicalName(),
-            ServiceProviders.class.getCanonicalName()
-        ));
+    static {
+        // Determine supported version at runtime. Netbeans supports being build
+        // on JDK 8, but also supports JDKs up to 12, the biggest known good
+        // source version will be reported
+        SourceVersion SUPPORTED_SOURCE_VERSION_BUILDER = null;
+        for(String version: new String[] {"RELEASE_12", "RELEASE_11", "RELEASE_10", "RELEASE_9"}) { //NOI18N
+            try {
+                SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.valueOf(version);
+                break;
+            } catch (IllegalArgumentException ex) {
+                // value not present skip it
+            }
+        }
+        if(SUPPORTED_SOURCE_VERSION_BUILDER == null) {
+            SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.RELEASE_8;
+        }
+        SUPPORTED_SOURCE_VERSION = SUPPORTED_SOURCE_VERSION_BUILDER;
+    }
+
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SUPPORTED_SOURCE_VERSION;
     }
 
     /** public for ServiceLoader */
     public ServiceProviderProcessor() {}
 
+    @Override
     protected boolean handleProcess(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         for (Element el : roundEnv.getElementsAnnotatedWith(ServiceProvider.class)) {
             ServiceProvider sp = el.getAnnotation(ServiceProvider.class);
@@ -79,7 +99,6 @@ public class ServiceProviderProcessor extends AbstractServiceProviderProcessor {
         try {
             svc.service();
             assert false;
-            return;
         } catch (MirroredTypeException e) {
             register(clazz, annotation, e.getTypeMirror(), svc.path(), svc.position(), svc.supersedes());
         }
@@ -106,8 +125,8 @@ public class ServiceProviderProcessor extends AbstractServiceProviderProcessor {
             return Collections.emptyList();
         }
         
-        Collection<Completion> result = new LinkedList<Completion>();
-        List<TypeElement> toProcess = new LinkedList<TypeElement>();
+        Collection<Completion> result = new LinkedList<>();
+        List<TypeElement> toProcess = new LinkedList<>();
 
         toProcess.add((TypeElement) annotated);
 
@@ -116,7 +135,7 @@ public class ServiceProviderProcessor extends AbstractServiceProviderProcessor {
 
             result.add(new TypeCompletion(c.getQualifiedName().toString() + ".class"));
 
-            List<TypeMirror> parents = new LinkedList<TypeMirror>();
+            List<TypeMirror> parents = new LinkedList<>();
 
             parents.add(c.getSuperclass());
             parents.addAll(c.getInterfaces());
@@ -145,10 +164,12 @@ public class ServiceProviderProcessor extends AbstractServiceProviderProcessor {
             this.type = type;
         }
 
+        @Override
         public String getValue() {
             return type;
         }
 
+        @Override
         public String getMessage() {
             return null;
         }

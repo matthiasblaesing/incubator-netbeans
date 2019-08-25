@@ -38,6 +38,27 @@ import org.openide.util.lookup.ServiceProvider;
  */
 @ServiceProvider(service=Processor.class)
 public final class OptionAnnotationProcessor implements Processor {
+    private static final SourceVersion SUPPORTED_SOURCE_VERSION;
+
+    static {
+        // Determine supported version at runtime. Netbeans supports being build
+        // on JDK 8, but also supports JDKs up to 12, the biggest known good
+        // source version will be reported
+        SourceVersion SUPPORTED_SOURCE_VERSION_BUILDER = null;
+        for(String version: new String[] {"RELEASE_12", "RELEASE_11", "RELEASE_10", "RELEASE_9"}) { //NOI18N
+            try {
+                SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.valueOf(version);
+                break;
+            } catch (IllegalArgumentException ex) {
+                // value not present skip it
+            }
+        }
+        if(SUPPORTED_SOURCE_VERSION_BUILDER == null) {
+            SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.RELEASE_8;
+        }
+        SUPPORTED_SOURCE_VERSION = SUPPORTED_SOURCE_VERSION_BUILDER;
+    }
+
     private Processor delegate;
     private String msg;
 
@@ -64,7 +85,7 @@ public final class OptionAnnotationProcessor implements Processor {
         if (delegate() != null) {
             return delegate().getSupportedSourceVersion();
         } else {
-            return SourceVersion.RELEASE_7;
+            return SUPPORTED_SOURCE_VERSION;
         }
     }
 

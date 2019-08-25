@@ -27,14 +27,12 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.FilerException;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedSourceVersion;
+import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.PackageElement;
@@ -42,22 +40,44 @@ import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.FileObject;
 import javax.tools.StandardLocation;
-import org.apache.tools.ant.util.FileUtils;
 import org.netbeans.modules.schema2beans.Schema2Beans;
 import org.netbeans.modules.schema2beans.Schema2Beans.Multiple;
 import org.netbeans.modules.schema2beansdev.GenBeans.Config;
 import org.openide.util.lookup.ServiceProvider;
 
 @ServiceProvider(service=Processor.class)
-@SupportedSourceVersion(SourceVersion.RELEASE_7)
+@SupportedAnnotationTypes({
+    "org.netbeans.modules.schema2beans.Schema2Beans", // NOI18N
+    "org.netbeans.modules.schema2beans.Schema2Beans.Multiple" // NOI18N
+})
 public class Schema2BeansProcessor extends AbstractProcessor {
+    private static final SourceVersion SUPPORTED_SOURCE_VERSION;
 
-    public @Override Set<String> getSupportedAnnotationTypes() {
-        return new HashSet<String>(Arrays.asList(
-                Schema2Beans.class.getCanonicalName(),
-                Multiple.class.getCanonicalName()));
+    static {
+        // Determine supported version at runtime. Netbeans supports being build
+        // on JDK 8, but also supports JDKs up to 12, the biggest known good
+        // source version will be reported
+        SourceVersion SUPPORTED_SOURCE_VERSION_BUILDER = null;
+        for(String version: new String[] {"RELEASE_12", "RELEASE_11", "RELEASE_10", "RELEASE_9"}) { // NOI18N
+            try {
+                SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.valueOf(version);
+                break;
+            } catch (IllegalArgumentException ex) {
+                // value not present skip it
+            }
+        }
+        if(SUPPORTED_SOURCE_VERSION_BUILDER == null) {
+            SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.RELEASE_8;
+        }
+        SUPPORTED_SOURCE_VERSION = SUPPORTED_SOURCE_VERSION_BUILDER;
     }
 
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SUPPORTED_SOURCE_VERSION;
+    }
+
+    @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         if (roundEnv.errorRaised() || roundEnv.processingOver()) {
             return false;
@@ -83,6 +103,7 @@ public class Schema2BeansProcessor extends AbstractProcessor {
             final String pkg = ((PackageElement) e).getQualifiedName().toString();
             config.setPackagePath(pkg);
             config.setOutputStreamProvider(new GenBeans.OutputStreamProvider() {
+                @Override
                 public OutputStream getStream(String dir, String name, String extension) throws IOException {
                     if (!dir.replace('\\', '/').endsWith(pkg.replace('.', '/'))) {
                         throw new IOException("Unexpected dir: " + dir);
@@ -98,6 +119,7 @@ public class Schema2BeansProcessor extends AbstractProcessor {
                         return new ByteArrayOutputStream(); // XXX could check that the same contents are written
                     }
                 }
+                @Override
                 public boolean isOlderThan(String dir, String name, String extension, long time) throws IOException {
                     return true;
                 }
@@ -170,9 +192,9 @@ public class Schema2BeansProcessor extends AbstractProcessor {
         } catch (Exception x) {
             processingEnv.getMessager().printMessage(Kind.ERROR, "Failed to process", e);
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            PrintStream ps = new PrintStream(baos);
-            x.printStackTrace(ps);
-            ps.close();
+            try (PrintStream ps = new PrintStream(baos)) {
+                x.printStackTrace(ps);
+            }
             processingEnv.getMessager().printMessage(Kind.ERROR, baos.toString());
         }
     }

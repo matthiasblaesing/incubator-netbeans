@@ -22,7 +22,7 @@ package org.netbeans.modules.sendopts;
 import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedSourceVersion;
+import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
@@ -41,14 +41,32 @@ import org.openide.filesystems.annotations.LayerGenerationException;
  *
  * @author Jaroslav Tulach <jtulach@netbeans.org>
  */
-@SupportedSourceVersion(SourceVersion.RELEASE_7)
+@SupportedAnnotationTypes("org.netbeans.spi.sendopts.Arg") //NOI18N
 final class OptionAnnotationProcessorImpl extends LayerGeneratingProcessor {
+    private static final SourceVersion SUPPORTED_SOURCE_VERSION;
+
+    static {
+        // Determine supported version at runtime. Netbeans supports being build
+        // on JDK 8, but also supports JDKs up to 12, the biggest known good
+        // source version will be reported
+        SourceVersion SUPPORTED_SOURCE_VERSION_BUILDER = null;
+        for(String version: new String[] {"RELEASE_12", "RELEASE_11", "RELEASE_10", "RELEASE_9"}) { //NOI18N
+            try {
+                SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.valueOf(version);
+                break;
+            } catch (IllegalArgumentException ex) {
+                // value not present skip it
+            }
+        }
+        if(SUPPORTED_SOURCE_VERSION_BUILDER == null) {
+            SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.RELEASE_8;
+        }
+        SUPPORTED_SOURCE_VERSION = SUPPORTED_SOURCE_VERSION_BUILDER;
+    }
 
     @Override
-    public Set<String> getSupportedAnnotationTypes() {
-        Set<String> set = new HashSet<String>();
-        set.add(Arg.class.getName());
-        return set;
+    public SourceVersion getSupportedSourceVersion() {
+        return SUPPORTED_SOURCE_VERSION;
     }
 
     @Override

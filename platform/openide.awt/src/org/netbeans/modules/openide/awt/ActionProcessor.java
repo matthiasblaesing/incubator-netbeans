@@ -30,7 +30,7 @@ import javax.annotation.processing.Completion;
 import javax.annotation.processing.Completions;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedSourceVersion;
+import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
@@ -74,24 +74,44 @@ import org.openide.util.lookup.ServiceProvider;
  * @author Jaroslav Tulach <jtulach@netbeans.org>
  */
 @ServiceProvider(service=Processor.class)
-@SupportedSourceVersion(SourceVersion.RELEASE_7)
+@SupportedAnnotationTypes({
+    "org.openide.awt.ActionRegistration",
+    "org.openide.awt.ActionID",
+    "org.openide.awt.ActionReference",
+    "org.openide.awt.ActionReferences"
+})
 public final class ActionProcessor extends LayerGeneratingProcessor {
     private static final String IDENTIFIER = "(?:\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)"; // NOI18N
     private static final Pattern FQN = Pattern.compile(IDENTIFIER + "(?:[.]" + IDENTIFIER + ")*"); // NOI18N
     private static final String[] DEFAULT_COMPLETIONS = { "Menu", "Toolbars", "Shortcuts", "Loaders" }; // NOI18N
-    private Processor COMPLETIONS;
+    private static final SourceVersion SUPPORTED_SOURCE_VERSION;
+
+    static {
+        // Determine supported version at runtime. Netbeans supports being build
+        // on JDK 8, but also supports JDKs up to 12, the biggest known good
+        // source version will be reported
+        SourceVersion SUPPORTED_SOURCE_VERSION_BUILDER = null;
+        for (String version : new String[]{"RELEASE_12", "RELEASE_11", "RELEASE_10", "RELEASE_9"}) { // NOI18N
+            try {
+                SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.valueOf(version);
+                break;
+            } catch (IllegalArgumentException ex) {
+                // value not present skip it
+            }
+        }
+        if (SUPPORTED_SOURCE_VERSION_BUILDER == null) {
+            SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.RELEASE_8;
+        }
+        SUPPORTED_SOURCE_VERSION = SUPPORTED_SOURCE_VERSION_BUILDER;
+    }
 
     @Override
-    public Set<String> getSupportedAnnotationTypes() {
-        Set<String> hash = new HashSet<String>();
-        hash.add(ActionRegistration.class.getCanonicalName());
-        hash.add(ActionID.class.getCanonicalName());
-        hash.add(ActionReference.class.getCanonicalName());
-        hash.add(ActionReferences.class.getCanonicalName());
-//        hash.add(ActionState.class.getCanonicalName());
-        return hash;
+    public SourceVersion getSupportedSourceVersion() {
+        return SUPPORTED_SOURCE_VERSION;
     }
-    
+
+    private Processor COMPLETIONS;
+
     @Override
     public Iterable<? extends Completion> getCompletions(Element element, AnnotationMirror annotation, ExecutableElement member, String userText) {
         /*

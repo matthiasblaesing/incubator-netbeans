@@ -18,11 +18,10 @@
  */
 package org.netbeans.modules.htmlui;
 
-import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedSourceVersion;
+import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -41,16 +40,35 @@ import org.openide.util.lookup.ServiceProvider;
  *
  * @author jtulach
  */
-@SupportedSourceVersion(SourceVersion.RELEASE_6)
+@SupportedAnnotationTypes("org.netbeans.api.htmlui.OpenHTMLRegistration") // NOI18N
 @ServiceProvider(service = Processor.class)
 public class HTMLViewProcessor extends LayerGeneratingProcessor {
-    @Override
-    public Set<String> getSupportedAnnotationTypes() {
-        Set<String> hash = new HashSet<>();
-        hash.add(OpenHTMLRegistration.class.getCanonicalName());
-        return hash;
+    private static final SourceVersion SUPPORTED_SOURCE_VERSION;
+
+    static {
+        // Determine supported version at runtime. Netbeans supports being build
+        // on JDK 8, but also supports JDKs up to 12, the biggest known good
+        // source version will be reported
+        SourceVersion SUPPORTED_SOURCE_VERSION_BUILDER = null;
+        for(String version: new String[] {"RELEASE_12", "RELEASE_11", "RELEASE_10", "RELEASE_9"}) { // NOI18N
+            try {
+                SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.valueOf(version);
+                break;
+            } catch (IllegalArgumentException ex) {
+                // value not present skip it
+            }
+        }
+        if(SUPPORTED_SOURCE_VERSION_BUILDER == null) {
+            SUPPORTED_SOURCE_VERSION_BUILDER = SourceVersion.RELEASE_8;
+        }
+        SUPPORTED_SOURCE_VERSION = SUPPORTED_SOURCE_VERSION_BUILDER;
     }
-    
+
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SUPPORTED_SOURCE_VERSION;
+    }
+
     @Override
     protected boolean handleProcess(Set<? extends TypeElement> set, RoundEnvironment re) throws LayerGenerationException {
         for (Element e : re.getElementsAnnotatedWith(OpenHTMLRegistration.class)) {
