@@ -761,6 +761,7 @@
                         suitename="${code.name.base}"
                         listener="org.testng.reporters.VerboseReporter"
                         jvm="${test.nbjdk.java}"
+                        verbose="2"
                 >
                     <classfileset dir="${build.test.@{test.type}.classes.dir}" excludes="${test.excludes}" includes="${test.includes}"/>
                     <propertyset refid="test.@{test.type}.properties"/>
