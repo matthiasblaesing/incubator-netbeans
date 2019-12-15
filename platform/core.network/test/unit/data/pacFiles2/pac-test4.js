@@ -231,6 +231,7 @@ function FindProxyForURL(url, host) {
     alert("myIpAddressEx(): Doing tests...");
 
     var myIpEx = myIpAddressEx();
+    alert("Got: " + myIpEx);
     if ((myIpEx === "127.0.0.1") || (myIpEx === "0:0:0:0:0:0:0:1") || (myIpEx === "::1"))
         return "PROXY myIpAddressEx:1";
 
