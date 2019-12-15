@@ -99,6 +99,7 @@ function FindProxyForURL(url, host) {
     alert("myIpAddress(): Doing tests...");
     
     var myIp = myIpAddress();
+    alert("Got: " + myIp);
     if ("127.0.0.1" === myIp)
         return "PROXY myIpAddress:1";
     
