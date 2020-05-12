@@ -19,6 +19,8 @@
 
 package org.netbeans.modules.ide.ergonomics.fod;
 
+import java.awt.Dialog;
+import java.awt.Dimension;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
@@ -26,16 +28,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.Icon;
+import javax.swing.JLabel;
+import javax.swing.SwingUtilities;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import javax.xml.parsers.DocumentBuilder;
@@ -67,9 +71,10 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import org.netbeans.api.project.ui.OpenProjects;
 import org.netbeans.spi.project.ui.LogicalViewProvider;
+import org.openide.DialogDescriptor;
+import org.openide.DialogDisplayer;
 import org.openide.filesystems.FileUtil;
 import org.openide.loaders.DataFolder;
-import org.openide.modules.SpecificationVersion;
 import org.openide.nodes.FilterNode;
 import org.openide.util.NbBundle;
 import org.openide.util.RequestProcessor.Task;
@@ -405,9 +410,7 @@ implements ProjectFactory, PropertyChangeListener, Runnable {
                 if (state == null) {
                     return;
                 }
-                RequestProcessor.Task t = FeatureManager.getInstance().create(this);
-                t.schedule(0);
-                t.waitFinished ();
+                this.run();
                 if (error == null) {
                     switchToReal();
                     // make sure support for projects we depend on are also enabled
@@ -461,13 +464,49 @@ implements ProjectFactory, PropertyChangeListener, Runnable {
                                 sb.toString());
                         return;
                     }
-                    if (toInstall != null && ! toInstall.isEmpty ()) {
-                        ModulesInstaller installer = new ModulesInstaller(toInstall, findModules, this);
-                        installer.getInstallTask ().waitFinished ();
-                    }
-                    if (toEnable != null && ! toEnable.isEmpty () && error == null) {
-                        ModulesActivator enabler = new ModulesActivator (toEnable, findModules, this);
-                        enabler.getEnableTask ().waitFinished ();
+                    CountDownLatch cdl = new CountDownLatch(1);
+                    SwingUtilities.invokeLater(() -> {
+                        Dialog[] d = new Dialog[1];
+                        DialogDescriptor dd = new DialogDescriptor(null, "Activate required features");
+                        ConfigurationPanel configPanel = new ConfigurationPanel(() -> {
+                            Dialog dlg = d[0];
+                            if(dlg != null) {
+                                dd.setValue(DialogDescriptor.OK_OPTION);
+                                dlg.setVisible(false);
+                            }
+                            return new JLabel("Installation is done");
+                        }) {
+                            @Override
+                            public Dimension getPreferredSize() {
+                                Dimension s = super.getPreferredSize();
+                                return new Dimension((int) s.getWidth(), (int) (s.getHeight() + 100));
+                            }
+
+                            @Override
+                            public Dimension getMinimumSize() {
+                                Dimension s = super.getMinimumSize();
+                                return new Dimension((int) s.getWidth(), (int) (s.getHeight() + 100));
+                            }
+                        };
+                        configPanel.setUpdateErrors(findModules.getUpdateErrors());
+                        configPanel.setInfo(info, getProjectDirectory().getName(), toInstall, findModules.getMissingModules(info),
+                            findModules.getExtrasToDownload(), findModules.isDownloadRequired());
+                        
+                        dd.setMessage(configPanel);
+                        dd.setModal(true);
+                        dd.setNoDefaultClose(false);
+                        dd.setOptions(new Object[] {DialogDescriptor.CANCEL_OPTION});
+                        d[0] = DialogDisplayer.getDefault().createDialog(dd);
+                        d[0].setVisible(true);
+                        cdl.countDown();
+                        if(dd.getValue() != DialogDescriptor.OK_OPTION) {
+                            error = "Installation was canceled";
+                        }
+                    });
+                    try {
+                        cdl.await();
+                    } catch (InterruptedException ex) {
+                        Exceptions.printStackTrace(ex);
                     }
                 } finally {
                     synchronized (this) {
