@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -190,18 +191,26 @@ public abstract class AbstractModel<T extends Component<T>>
     }
 
     protected void setState(State s, String message) {
-        if (s == status) {
+        if (s == status && Objects.equals(message, statusMessage)) {
             return;
         }
-        State old = status;
-        status = s;
-        statusMessage = message;
-        PropertyChangeEvent event =
-                new PropertyChangeEvent(this, STATE_PROPERTY, old, status);
-        if (isIntransaction()) {
-            firePropertyChangeEvent(event);
-        } else {
-            pcs.firePropertyChange(event);
+        List<PropertyChangeEvent> events = new ArrayList<>(2);
+        if(status != s) {
+            State oldState = status;
+            status = s;
+            events.add(new PropertyChangeEvent(this, STATE_PROPERTY, oldState, status));
+        }
+        if(! Objects.equals(message, statusMessage)) {
+            String oldMessage = statusMessage;
+            statusMessage = message;
+            events.add(new PropertyChangeEvent(this, STATUS_MESSAGE_PROPERTY, oldMessage, statusMessage));
+        }
+        for (PropertyChangeEvent event : events) {
+            if (isIntransaction()) {
+                firePropertyChangeEvent(event);
+            } else {
+                pcs.firePropertyChange(event);
+            }
         }
     }
     

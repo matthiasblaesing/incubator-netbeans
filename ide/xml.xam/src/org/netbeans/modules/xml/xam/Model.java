@@ -34,6 +34,7 @@ import org.netbeans.api.annotations.common.CheckReturnValue;
 public interface Model<C extends Component<C>> extends Referenceable {
     
     public static final String STATE_PROPERTY = "state";
+    public static final String STATUS_MESSAGE_PROPERTY = "statusMessage";
     
     /**
      * Adds coarse-grained change listener for events on model components.
